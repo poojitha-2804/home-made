@@ -4,6 +4,9 @@ import boto3
 from datetime import datetime
 import json,uuid
 from decimal import Decimal
+import os
+app.config['SQLALCHE MY_DATABASE_URI'] = OS.environ.get('DATABASE_URL','sqlite:///site.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 app = Flask(__name__)
 app.secret_key = 'your_very_secret_key_12345'  # Change for production!
