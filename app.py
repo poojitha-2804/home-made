@@ -4,20 +4,20 @@ import uuid
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
-from decimal import Decimal
 from flask_sqlalchemy import SQLAlchemy
 
-# 1. Initialize App & Config
+# ------------------ 1. Initialize App ------------------
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'student_project_secret_123')
 
-# 2. Database Setup (Using the Render Postgres you created)
-# This looks for DATABASE_URL; if not found, it uses a local sqlite file.
+# ------------------ 2. Database Setup ------------------
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///site.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 db = SQLAlchemy(app)
 
-# 3. Database Models
+# ------------------ 3. Database Models ------------------
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
@@ -35,7 +35,8 @@ class Order(db.Model):
 with app.app_context():
     db.create_all()
 
-# 4. Product Data Store
+# ------------------ 4. Product Data ------------------
+
 products = {
     'non_veg_pickles': [
         {'id': 1, 'name': 'Chicken Pickle', 'weights': {'250': 600, '500': 1200, '1000': 1800}},
@@ -60,75 +61,134 @@ products = {
     ]
 }
 
-# ================== ROUTES ==================
+# ------------------ ROUTES ------------------
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
+
+# ------------------ Signup ------------------
+
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
+
         username = request.form.get('username', '').strip()
         email = request.form.get('email', '').strip()
         password = request.form.get('password')
 
         if User.query.filter_by(username=username).first():
-            return render_template('signup.html', error='Username already taken')
+            return render_template('signup.html', error='Username already exists')
+
+        if User.query.filter_by(email=email).first():
+            return render_template('signup.html', error='Email already registered')
 
         hashed_pw = generate_password_hash(password)
-        new_user = User(username=username, email=email, password=hashed_pw)
+
+        new_user = User(
+            username=username,
+            email=email,
+            password=hashed_pw
+        )
+
         db.session.add(new_user)
         db.session.commit()
+
+        flash("Account created successfully!")
         return redirect(url_for('login'))
 
     return render_template('signup.html')
 
+
+# ------------------ Login ------------------
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+
     if request.method == 'POST':
+
         username = request.form.get('username')
         password = request.form.get('password')
 
         user = User.query.filter_by(username=username).first()
+
         if user and check_password_hash(user.password, password):
+
             session['logged_in'] = True
             session['username'] = username
+
             return redirect(url_for('home'))
-        
-        return render_template('login.html', error='Invalid credentials')
+
+        return render_template('login.html', error="Invalid username or password")
 
     return render_template('login.html')
+
+
+# ------------------ Logout ------------------
 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
 
+
+# ------------------ Home ------------------
+
 @app.route('/home')
 def home():
-    if not session.get('logged_in'): return redirect(url_for('login'))
+
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+
     return render_template('home.html')
+
+
+# ------------------ Product Category ------------------
 
 @app.route('/category/<type>')
 def show_products(type):
-    if not session.get('logged_in'): return redirect(url_for('login'))
+
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+
     if type in products:
-        return render_template(f'{type}.html', products=products[type])
+        return render_template(f"{type}.html", products=products[type])
+
     return redirect(url_for('home'))
+
+
+# ------------------ Checkout ------------------
 
 @app.route('/checkout', methods=['GET', 'POST'])
 def checkout():
-    if not session.get('logged_in'): return redirect(url_for('login'))
-    
+
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+
     if request.method == 'POST':
+
         cart_json = request.form.get('cart_data', '[]')
         total = float(request.form.get('total_amount', '0'))
-        
+
         new_order = Order(
             id=str(uuid.uuid4()),
             username=session['username'],
             items=cart_json,
             total=total
         )
+
         db.session.add(new_order)
+        db.session.commit()
+
+        flash("Order placed successfully!")
+
+        return redirect(url_for('home'))
+
+    return render_template('checkout.html')
+
+
+# ------------------ Run App ------------------
+
+if __name__ == '__main__':
+    app.run(debug=True)
