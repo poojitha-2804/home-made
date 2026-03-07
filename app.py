@@ -1,23 +1,41 @@
 import os
 import json
 import uuid
-import boto3
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from decimal import Decimal
+from flask_sqlalchemy import SQLAlchemy
 
 # 1. Initialize App & Config
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'your_very_secret_key_12345')
+app.secret_key = os.environ.get('SECRET_KEY', 'student_project_secret_123')
 
-# 2. AWS DynamoDB Setup
-# Ensure your AWS credentials are set in environment variables or ~/.aws/credentials
-dynamodb = boto3.resource('dynamodb', region_name='ap-south-1')
-users_table = dynamodb.Table('Users')
-orders_table = dynamodb.Table('Orders')
+# 2. Database Setup (Using the Render Postgres you created)
+# This looks for DATABASE_URL; if not found, it uses a local sqlite file.
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///site.db')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
-# 3. Product Data Store
+# 3. Database Models
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password = db.Column(db.String(200), nullable=False)
+
+class Order(db.Model):
+    id = db.Column(db.String(100), primary_key=True)
+    username = db.Column(db.String(80), nullable=False)
+    items = db.Column(db.Text, nullable=False)
+    total = db.Column(db.Float, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+
+# Create tables
+with app.app_context():
+    db.create_all()
+
+# 4. Product Data Store
 products = {
     'non_veg_pickles': [
         {'id': 1, 'name': 'Chicken Pickle', 'weights': {'250': 600, '500': 1200, '1000': 1800}},
@@ -42,7 +60,7 @@ products = {
     ]
 }
 
-# ================== AUTH ROUTES ==================
+# ================== ROUTES ==================
 
 @app.route('/')
 def index():
@@ -55,21 +73,14 @@ def signup():
         email = request.form.get('email', '').strip()
         password = request.form.get('password')
 
-        try:
-            # Check if user exists
-            response = users_table.get_item(Key={'username': username})
-            if 'Item' in response:
-                return render_template('signup.html', error='Username already taken')
+        if User.query.filter_by(username=username).first():
+            return render_template('signup.html', error='Username already taken')
 
-            # Hash and Store
-            hashed_pw = generate_password_hash(password)
-            users_table.put_item(
-                Item={'username': username, 'email': email, 'password': hashed_pw}
-            )
-            return redirect(url_for('login'))
-        except Exception as e:
-            app.logger.error(f"Signup Error: {e}")
-            return render_template('signup.html', error='Database error')
+        hashed_pw = generate_password_hash(password)
+        new_user = User(username=username, email=email, password=hashed_pw)
+        db.session.add(new_user)
+        db.session.commit()
+        return redirect(url_for('login'))
 
     return render_template('signup.html')
 
@@ -79,18 +90,13 @@ def login():
         username = request.form.get('username')
         password = request.form.get('password')
 
-        try:
-            response = users_table.get_item(Key={'username': username})
-            if 'Item' in response:
-                user = response['Item']
-                if check_password_hash(user['password'], password):
-                    session['logged_in'] = True
-                    session['username'] = username
-                    return redirect(url_for('home'))
-            
-            return render_template('login.html', error='Invalid credentials')
-        except Exception as e:
-            return render_template('login.html', error='Login failed')
+        user = User.query.filter_by(username=username).first()
+        if user and check_password_hash(user.password, password):
+            session['logged_in'] = True
+            session['username'] = username
+            return redirect(url_for('home'))
+        
+        return render_template('login.html', error='Invalid credentials')
 
     return render_template('login.html')
 
@@ -98,8 +104,6 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for('login'))
-
-# ================== SHOP ROUTES ==================
 
 @app.route('/home')
 def home():
@@ -113,27 +117,18 @@ def show_products(type):
         return render_template(f'{type}.html', products=products[type])
     return redirect(url_for('home'))
 
-# ================== CHECKOUT LOGIC ==================
-
 @app.route('/checkout', methods=['GET', 'POST'])
 def checkout():
-    if not session.get('logged_in'):
-        return redirect(url_for('login'))
+    if not session.get('logged_in'): return redirect(url_for('login'))
     
     if request.method == 'POST':
-        name = request.form.get('name')
-        address = request.form.get('address')
-        phone = request.form.get('phone')
+        cart_json = request.form.get('cart_data', '[]')
+        total = float(request.form.get('total_amount', '0'))
         
-        # Parse Cart Data from JSON hidden input
-        try:
-            cart_json = request.form.get('cart_data', '[]')
-            cart_items = json.loads(cart_json, parse_float=Decimal)
-            total = Decimal(request.form.get('total_amount', '0'))
-
-            if not cart_items:
-                return render_template('checkout.html', error="Cart is empty")
-
-            order_id = str(uuid.uuid4())
-            orders_table.put_item(
-                Item={
+        new_order = Order(
+            id=str(uuid.uuid4()),
+            username=session['username'],
+            items=cart_json,
+            total=total
+        )
+        db.session.add(new_order)
