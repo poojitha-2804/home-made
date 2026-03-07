@@ -1,30 +1,31 @@
 import os
 import json
 import uuid
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 
-# ------------------ 1. Initialize App ------------------
+# ------------------ Initialize App ------------------
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'student_project_secret_123')
 
-# ------------------ 2. Database Setup ------------------
+# ------------------ Database Setup ------------------
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///site.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# ------------------ 3. Database Models ------------------
+# ------------------ Database Models ------------------
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
+
 
 class Order(db.Model):
     id = db.Column(db.String(100), primary_key=True)
@@ -33,11 +34,12 @@ class Order(db.Model):
     total = db.Column(db.Float, nullable=False)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
+
 # Create tables
 with app.app_context():
     db.create_all()
 
-# ------------------ 4. Product Data ------------------
+# ------------------ Product Data ------------------
 
 products = {
     'non_veg_pickles': [
@@ -65,7 +67,7 @@ products = {
     ]
 }
 
-# ------------------ ROUTES ------------------
+# ------------------ Routes ------------------
 
 @app.route('/')
 def index():
@@ -84,10 +86,10 @@ def signup():
         password = request.form.get('password')
 
         if User.query.filter_by(username=username).first():
-            return render_template('signup.html', error='Username already exists')
+            return render_template('signup.html', error="Username already exists")
 
         if User.query.filter_by(email=email).first():
-            return render_template('signup.html', error='Email already registered')
+            return render_template('signup.html', error="Email already registered")
 
         hashed_pw = generate_password_hash(password)
 
@@ -187,7 +189,6 @@ def checkout():
         db.session.commit()
 
         flash("Order placed successfully!")
-
         return redirect(url_for('home'))
 
     return render_template('checkout.html')
@@ -195,9 +196,9 @@ def checkout():
 
 # ------------------ Homemade Status Route ------------------
 
-@app.route("/homemade")
+@app.route('/homemade')
 def homemade():
-    return {"status": "Homemade Pickle Store Application Running"}, 200
+    return jsonify({"status": "Homemade Pickle Store Application Running"}), 200
 
 
 # ------------------ Run App ------------------
