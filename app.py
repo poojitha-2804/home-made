@@ -7,10 +7,12 @@ from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 
 # ------------------ 1. Initialize App ------------------
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'student_project_secret_123')
 
 # ------------------ 2. Database Setup ------------------
+
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///site.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -46,6 +48,7 @@ products = {
         {'id': 5, 'name': 'Gongura Prawns', 'weights': {'250': 600, '500': 1200, '1000': 1800}},
         {'id': 6, 'name': 'Chicken Pickle (Gongura)', 'weights': {'250': 350, '500': 700, '1000': 1050}}
     ],
+
     'veg_pickles': [
         {'id': 7, 'name': 'Traditional Mango Pickle', 'weights': {'250': 150, '500': 280, '1000': 500}},
         {'id': 8, 'name': 'Zesty Lemon Pickle', 'weights': {'250': 120, '500': 220, '1000': 400}},
@@ -54,6 +57,7 @@ products = {
         {'id': 11, 'name': 'Chintakaya Pickle', 'weights': {'250': 130, '500': 240, '1000': 450}},
         {'id': 12, 'name': 'Spicy Pandu Mirchi', 'weights': {'250': 130, '500': 240, '1000': 450}}
     ],
+
     'snacks': [
         {'id': 13, 'name': 'Banana Chips', 'weights': {'250': 300, '500': 600, '1000': 800}},
         {'id': 14, 'name': 'Ragi Laddu', 'weights': {'250': 350, '500': 700, '1000': 1000}},
@@ -72,6 +76,7 @@ def index():
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
+
     if request.method == 'POST':
 
         username = request.form.get('username', '').strip()
@@ -188,7 +193,14 @@ def checkout():
     return render_template('checkout.html')
 
 
+# ------------------ Homemade Status Route ------------------
+
+@app.route("/homemade")
+def homemade():
+    return {"status": "Homemade Pickle Store Application Running"}, 200
+
+
 # ------------------ Run App ------------------
 
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
