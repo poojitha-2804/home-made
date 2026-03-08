@@ -169,6 +169,9 @@ def snacks():
         return redirect(url_for('login'))
     return render_template('snacks.html', products=products['snacks'])
 
+@app.route('/cart')
+def cart():
+
 
 # ------------------ Product Category ------------------
 
