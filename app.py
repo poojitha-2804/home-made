@@ -179,6 +179,11 @@ def snacks():
 
 @app.route('/cart')
 def cart():
+    
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+
+    return render_template('cart.html')
 
 
 # ------------------ Product Category ------------------
