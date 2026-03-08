@@ -149,7 +149,7 @@ def home():
         return redirect(url_for('login'))
 
     return render_template('home.html')
-    @app.route('/veg_pickles')
+@app.route('/veg_pickles')
 def veg_pickles():
     if not session.get('logged_in'):
         return redirect(url_for('login'))
