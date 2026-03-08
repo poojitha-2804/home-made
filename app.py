@@ -149,6 +149,25 @@ def home():
         return redirect(url_for('login'))
 
     return render_template('home.html')
+    @app.route('/veg_pickles')
+def veg_pickles():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    return render_template('veg_pickles.html', products=products['veg_pickles'])
+
+
+@app.route('/non_veg_pickles')
+def non_veg_pickles():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    return render_template('non_veg_pickles.html', products=products['non_veg_pickles'])
+
+
+@app.route('/snacks')
+def snacks():
+    if not session.get('logged_in'):
+        return redirect(url_for('login'))
+    return render_template('snacks.html', products=products['snacks'])
 
 
 # ------------------ Product Category ------------------
